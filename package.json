@@ -1,0 +1,22 @@
+{
+  "name": "discord.collect",
+  "version": "1.2.0-restoration",
+  "description": "Discord.Collect discord library",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Silentic-xyz/discord.collect.git"
+  },
+  "keywords": [
+    "discord"
+  ],
+  "author": "sudo aka buj",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Silentic-xyz/discord.collect/issues"
+  },
+  "homepage": "https://github.com/Silentic-xyz/discord.collect#readme"
+}
