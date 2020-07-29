@@ -1,4 +1,5 @@
 const fetch = require('node-fetch').default;
+const Role = require('./Role');
 
 /**
  * @typedef { {
@@ -18,7 +19,7 @@ const fetch = require('node-fetch').default;
         verification_level: number,
         default_message_notifications: number,
         explicit_content_filter: number,
-        roles: [],
+        roles: RawRoleData[],
         emojis: [],
         features: [],
         mfa_level: number,
@@ -49,6 +50,16 @@ const fetch = require('node-fetch').default;
         approximate_member_count: number?,
         approximate_presence_count: number?,
     } } GuildRawData
+ * @typedef {{
+        id: string,
+        name: string,
+        color: number,
+        hoist: boolean,
+        position: number,
+        permissions: number,
+        managed: boolean,
+        mentionable: boolean,
+    }} RawRoleData
  */
 
 /**
@@ -95,5 +106,7 @@ function Guild(raw, token) {
         ), token);
     }
     this.fetch = fetch;
+
+    this.roles = raw.roles ? raw.roles.map(r => new Role(r)) : undefined;
 }
 module.exports = Guild;

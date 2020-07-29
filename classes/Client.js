@@ -2,19 +2,11 @@ const lib = require('../lib');
 const Heartbeat = require('./Heartbeat');
 const {GuildsManager} = require('./DataManager');
 const Guild = require('./Guild');
+const { EventEmitter } = require('events');
 
 /**
  * @typedef { 'discord.collect' | 'Discord Android' | 'Discord IOS' | 'Discord Desktop' } ClientBrowser
  * @typedef { { gateway: string?, debugger: (message: string) => void, token: string?, browser: ClientBrowser?, device: ClientBrowser?, platform: Platform? } } ClientSettings
- * @typedef {
-        'login' |
-        'message' |
-        'ready' |
-        'close' |
-        'log' |
-        'raw' |
-        'guild'
-} ClientEvent
  * @typedef { 'darwin' | 'openbsd' | 'linux' | 'windows' } Platform
  * @typedef { { op: number, d: any, t: RawDataIntent?, s: number? } } RawData
  * @typedef {
@@ -60,6 +52,13 @@ const Guild = require('./Guild');
         'MESSAGE_REACTION_REMOVE_EMOJI' |
         'TYPING_START'
     } RawDataIntent
+ * @typedef {
+        ((arg0: "login", arg1: Function) => {}) &
+        ((arg0: "ready", arg1: Function) => {}) &
+        ((arg0: "close", arg1: Function) => {}) &
+        ((arg0: "raw", arg1: ((arg0: lib.WebSocket, arg1: RawData) => {})) => {}) &
+        ((arg0: "guild", arg1: ((arg0: Guild) => {})) => {})
+    } ClientEvents
  */
 
 /**
@@ -69,7 +68,14 @@ const Guild = require('./Guild');
 function Client(settings) {
     const ws = new lib.WebSocket((settings || {}).gateway || 'wss://gateway.discord.gg/?v=6&encoding=json');
     const heartbeat = new Heartbeat(this);
-    const events = new (require('events').EventEmitter)();
+    /**
+     * @fires Client#login
+     * @fires Client#ready
+     * @fires Client#raw
+     * @fires Client#close
+     * @fires Client#guild
+     */
+    const events = new EventEmitter();
     const guilds = new GuildsManager();
 
     ws.json = (d) => ws.send(JSON.stringify(d));
@@ -80,6 +86,7 @@ function Client(settings) {
 
     ws.on('close', () => {
         if ((settings || {}).debugger) settings.debugger("Gateway closed");
+        
         events.emit('close');
     });
 
@@ -123,51 +130,43 @@ function Client(settings) {
     }
 
     /**
-     * Listen once for an event
-     * @param {ClientEvent} event 
-     * @param {(...any) => {}} cb 
+     * Listen for an event
+     * @type {ClientEvents}
      */
-    function once(event, cb) {
-        events.once(event, cb);
+    const on = (...args) => {
+        events.on(...args);
     }
+    this.on = on;
 
     /**
      * Listen for an event
-     * @param {ClientEvent} event 
-     * @param {(...any) => {}} cb 
+     * @type {ClientEvents}
      */
-    function on(event, cb) {
-        events.on(event, cb);
+    const off = (...args) => {
+        events.on(...args);
     }
+    this.off = off;
 
     /**
-     * Stop listening for an event
-     * @param {ClientEvent} event 
-     * @param {(...any) => {}} cb 
+     * Listen for an event
+     * @type {ClientEvents}
      */
-    function off(event, cb) {
-        events.off(event, cb);
+    const once = (...args) => {
+        events.on(...args);
     }
+    this.once = once;
 
     this.destroy = disconnect;
     this.disconnect = disconnect;
     this.login = login;
-    this.ws = ws;
-    this.on = on;
-    this.once = once;
-    this.off = off;
     this.guilds = guilds;
     this.settings = settings;
+    this.ws = ws;
 
     //Some descryptors
 
-    events.on('raw',
-        /**
-         * [EVENT] On identify
-         * @param {lib.WebSocket} ws WebSocket
-         * @param {{ op: number, s: ?number, d: any, t: string }} data Data
-         */
-        function onRaw(ws, data) {
+    on('raw',
+        (ws, data) => {
             if (data.op != 10) return;
 
             heartbeat.setHeartbeat(data.d.heartbeat_interval);
@@ -187,11 +186,6 @@ function Client(settings) {
     );
 
     events.on('raw',
-        /**
-         * [EVENT] On identify
-         * @param {WebSocket} ws WebSocket
-         * @param {RawData} data Data
-         */
         function onRaw(ws, data) {
             if (data.op != 0 && data.t != 'READY') return;
 
@@ -200,11 +194,6 @@ function Client(settings) {
     );
 
     events.on('raw',
-        /**
-         * [EVENT] On identify
-         * @param {WebSocket} ws WebSocket
-         * @param {RawData} data Data
-         */
         function onRaw(ws, data) {
             if (data.op != 0 || data.t != 'READY') return;
 
@@ -213,11 +202,6 @@ function Client(settings) {
     );
 
     events.on('raw',
-        /**
-         * [EVENT] On identify
-         * @param {WebSocket} ws WebSocket
-         * @param {RawData} data Data
-         */
         function onRaw(ws, data) {
             if (data.op != 0 || data.t != 'GUILD_CREATE') return;
 
@@ -237,11 +221,6 @@ function Client(settings) {
     );
 
     events.on('raw',
-        /**
-         * [EVENT] On identify
-         * @param {WebSocket} ws WebSocket
-         * @param {RawData} data Data
-         */
         function onRaw(ws, data) {
             if (data.op != 0 || data.t != 'GUILD_DELETE') return;
 
@@ -252,11 +231,6 @@ function Client(settings) {
     );
 
     events.on('raw',
-        /**
-         * [EVENT] On identify
-         * @param {WebSocket} ws WebSocket
-         * @param {RawData} data Data
-         */
         function onRaw(ws, data) {
             if (data.op != 0 || data.t != 'GUILD_UPDATE') return;
 
@@ -266,4 +240,32 @@ function Client(settings) {
         }
     );
 }
+Client.__proto__ = EventEmitter;
 module.exports = Client;
+
+/**
+ * Ready event
+ *
+ * @event Client#ready
+ */
+
+/**
+ * Close event
+ *
+ * @event Client#close
+ */
+
+/**
+ * Raw data event
+ *
+ * @event Client#raw
+ * @property {lib.WebSocket} ws WebSocket
+ * @property {RawData} data Raw data
+ */
+
+/**
+ * Guild update event
+ * 
+ * @event Client#guild
+ * @property {Guild} guild Updated guild
+ */
