@@ -1,12 +1,65 @@
 const lib = require('../lib');
 const Heartbeat = require('./Heartbeat');
-const {Collection} = require('@discordjs/collection');
+const {GuildsManager} = require('./DataManager');
+const Guild = require('./Guild');
 
 /**
  * @typedef { 'discord.collect' | 'Discord Android' | 'Discord IOS' | 'Discord Desktop' } ClientBrowser
  * @typedef { { gateway: string?, debugger: (message: string) => void, token: string?, browser: ClientBrowser?, device: ClientBrowser?, platform: Platform? } } ClientSettings
- * @typedef { 'login' | 'message' | 'ready' | 'close' | 'log' | 'raw' } ClientEvent
+ * @typedef {
+        'login' |
+        'message' |
+        'ready' |
+        'close' |
+        'log' |
+        'raw' |
+        'guild'
+} ClientEvent
  * @typedef { 'darwin' | 'openbsd' | 'linux' | 'windows' } Platform
+ * @typedef { { op: number, d: any, t: RawDataIntent?, s: number? } } RawData
+ * @typedef {
+        'READY' |
+        'GUILD_CREATE' |
+        'GUILD_UPDATE' |
+        'GUILD_DELETE' |
+        'GUILD_ROLE_CREATE' |
+        'GUILD_ROLE_UPDATE' |
+        'GUILD_ROLE_DELETE' |
+        'CHANNEL_CREATE' |
+        'CHANNEL_UPDATE' |
+        'CHANNEL_DELETE' |
+        'CHANNEL_PINS_UPDATE' |
+        'GUILD_MEMBER_ADD' |
+        'GUILD_MEMBER_UPDATE' |
+        'GUILD_MEMBER_REMOVE' |
+        'GUILD_BAN_ADD' |
+        'GUILD_BAN_REMOVE' |
+        'GUILD_EMOJIS_UPDATE' |
+        'GUILD_INTEGRATIONS_UPDATE' |
+        'WEBHOOKS_UPDATE' |
+        'INVITE_CREATE' |
+        'INVITE_DELETE' |
+        'VOICE_STATE_UPDATE' |
+        'PRESENCE_UPDATE' |
+        'MESSAGE_CREATE' |
+        'MESSAGE_UPDATE' |
+        'MESSAGE_DELETE' |
+        'MESSAGE_DELETE_BULK' |
+        'MESSAGE_REACTION_ADD' |
+        'MESSAGE_REACTION_REMOVE' |
+        'MESSAGE_REACTION_REMOVE_ALL' |
+        'MESSAGE_REACTION_REMOVE_EMOJI' |
+        'CHANNEL_CREATE' |
+        'MESSAGE_CREATE' |
+        'MESSAGE_UPDATE' |
+        'MESSAGE_DELETE' |
+        'CHANNEL_PINS_UPDATE' |
+        'MESSAGE_REACTION_ADD' |
+        'MESSAGE_REACTION_REMOVE' |
+        'MESSAGE_REACTION_REMOVE_ALL' |
+        'MESSAGE_REACTION_REMOVE_EMOJI' |
+        'TYPING_START'
+    } RawDataIntent
  */
 
 /**
@@ -17,6 +70,7 @@ function Client(settings) {
     const ws = new lib.WebSocket((settings || {}).gateway || 'wss://gateway.discord.gg/?v=6&encoding=json');
     const heartbeat = new Heartbeat(this);
     const events = new (require('events').EventEmitter)();
+    const guilds = new GuildsManager();
 
     ws.json = (d) => ws.send(JSON.stringify(d));
 
@@ -102,7 +156,8 @@ function Client(settings) {
     this.on = on;
     this.once = once;
     this.off = off;
-    this.guilds = new Collection();
+    this.guilds = guilds;
+    this.settings = settings;
 
     //Some descryptors
 
@@ -114,6 +169,8 @@ function Client(settings) {
          */
         function onRaw(ws, data) {
             if (data.op != 10) return;
+
+            heartbeat.setHeartbeat(data.d.heartbeat_interval);
 
             ws.json({
                 "op": 2,
@@ -133,12 +190,79 @@ function Client(settings) {
         /**
          * [EVENT] On identify
          * @param {WebSocket} ws WebSocket
-         * @param {{ op: number, s: ?number, d: any, t: string }} data Data
+         * @param {RawData} data Data
          */
         function onRaw(ws, data) {
             if (data.op != 0 && data.t != 'READY') return;
 
             events.emit('login');
+        }
+    );
+
+    events.on('raw',
+        /**
+         * [EVENT] On identify
+         * @param {WebSocket} ws WebSocket
+         * @param {RawData} data Data
+         */
+        function onRaw(ws, data) {
+            if (data.op != 0 || data.t != 'READY') return;
+
+            events.emit('login');
+        }
+    );
+
+    events.on('raw',
+        /**
+         * [EVENT] On identify
+         * @param {WebSocket} ws WebSocket
+         * @param {RawData} data Data
+         */
+        function onRaw(ws, data) {
+            if (data.op != 0 || data.t != 'GUILD_CREATE') return;
+
+            if (data.d.guilds) {
+                for (let guild of data.d.guilds) {
+                    const g = new Guild(guild);
+                    guilds.set(g.id, g);
+                    events.emit('guild', g);
+                }
+            }
+            else {
+                const g = new Guild(data.d);
+                guilds.set(g.id, g);
+                events.emit('guild', g);
+            }
+        }
+    );
+
+    events.on('raw',
+        /**
+         * [EVENT] On identify
+         * @param {WebSocket} ws WebSocket
+         * @param {RawData} data Data
+         */
+        function onRaw(ws, data) {
+            if (data.op != 0 || data.t != 'GUILD_DELETE') return;
+
+            const g = new Guild(data.d);
+            guilds.set(data.id, g);
+            events.emit('guild', g);
+        }
+    );
+
+    events.on('raw',
+        /**
+         * [EVENT] On identify
+         * @param {WebSocket} ws WebSocket
+         * @param {RawData} data Data
+         */
+        function onRaw(ws, data) {
+            if (data.op != 0 || data.t != 'GUILD_UPDATE') return;
+
+            const g = new Guild(data.d);
+            guilds.set(data.id, g);
+            events.emit('guild', g);
         }
     );
 }
