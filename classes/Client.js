@@ -1,15 +1,23 @@
 const lib = require('../lib');
 const Heartbeat = require('./Heartbeat');
 const {GuildsManager} = require('./DataManager');
-const Guild = require('./Guild');
-const { EventEmitter } = require('events');
+const {Guild, UncachedGuild} = require('./Guild');
+const {EventEmitter} = require('events');
 
 /**
- * @typedef { 'discord.collect' | 'Discord Android' | 'Discord IOS' | 'Discord Desktop' } ClientBrowser
- * @typedef { { gateway: string?, debugger: (message: string) => void, token: string?, browser: ClientBrowser?, device: ClientBrowser?, platform: Platform? } } ClientSettings
- * @typedef { 'darwin' | 'openbsd' | 'linux' | 'windows' } Platform
- * @typedef { { op: number, d: any, t: RawDataIntent?, s: number? } } RawData
- * @typedef {
+   @typedef { 'discord.collect' | 'Discord Android' | 'Discord IOS' | 'Discord Desktop' } ClientBrowser
+   @typedef {{
+        gateway: string?,
+        debugger: (message: string) => void,
+        token: string?,
+        browser: ClientBrowser?,
+        device: ClientBrowser?,
+        platform: Platform?,
+        cache: boolean?,
+    }} ClientSettings
+   @typedef { 'darwin' | 'openbsd' | 'linux' | 'windows' } Platform
+   @typedef { { op: number, d: any, t: RawDataIntent?, s: number? } } RawData
+   @typedef {
         'READY' |
         'GUILD_CREATE' |
         'GUILD_UPDATE' |
@@ -57,7 +65,8 @@ const { EventEmitter } = require('events');
         ((arg0: "ready", arg1: Function) => {}) &
         ((arg0: "close", arg1: Function) => {}) &
         ((arg0: "raw", arg1: ((arg0: lib.WebSocket, arg1: RawData) => {})) => {}) &
-        ((arg0: "guild", arg1: ((arg0: Guild) => {})) => {})
+        ((arg0: "guildRecieved", arg1: ((arg0: UncachedGuild) => {})) => {}) &
+        ((arg0: "guildReady", arg1: ((arg0: Guild) => {})) => {})
     } ClientEvents
  */
 
@@ -77,6 +86,8 @@ function Client(settings) {
      */
     const events = new EventEmitter();
     const guilds = new GuildsManager();
+
+    if (typeof settings.cache == 'undefined') settings.cache = true;
 
     ws.json = (d) => ws.send(JSON.stringify(d));
 
@@ -207,15 +218,29 @@ function Client(settings) {
 
             if (data.d.guilds) {
                 for (let guild of data.d.guilds) {
-                    const g = new Guild(guild);
-                    guilds.set(g.id, g);
-                    events.emit('guild', g);
+                    if (!guild.unanivable) {
+                        const g = new Guild(guild);
+                        if (settings.cache) guilds.set(g.id, g);
+                        events.emit('guildReady', g);
+                    }
+                    else {
+                        const g = new UncachedGuild(guild);
+                        if (settings.cache) guilds.set(g.id, g);
+                        events.emit('guildRecieved', g);
+                    }
                 }
             }
             else {
-                const g = new Guild(data.d);
-                guilds.set(g.id, g);
-                events.emit('guild', g);
+                if (!data.d.unanivable) {
+                    const g = new Guild(data.d);
+                    if (settings.cache) guilds.set(g.id, g);
+                    events.emit('guildReady', g);
+                }
+                else {
+                    const g = new UncachedGuild(data.d);
+                    guilds.set(g.id, g);
+                    events.emit('guildRecieved', g);
+                }
             }
         }
     );
@@ -224,9 +249,16 @@ function Client(settings) {
         function onRaw(ws, data) {
             if (data.op != 0 || data.t != 'GUILD_DELETE') return;
 
-            const g = new Guild(data.d);
-            guilds.set(data.id, g);
-            events.emit('guild', g);
+            if (!data.d.unanivable) {
+                const g = new Guild(data.d);
+                if (settings.cache) guilds.set(data.id, g);
+                events.emit('guildReady', g);
+            }
+            else {
+                const g = new UncachedGuild(data.d);
+                if (settings.cache) guilds.set(data.id, g);
+                events.emit('guildRecieved', g);
+            }
         }
     );
 
@@ -234,9 +266,16 @@ function Client(settings) {
         function onRaw(ws, data) {
             if (data.op != 0 || data.t != 'GUILD_UPDATE') return;
 
-            const g = new Guild(data.d);
-            guilds.set(data.id, g);
-            events.emit('guild', g);
+            if (!data.d.unanivable) {
+                const g = new Guild(data.d);
+                if (settings.cache) guilds.set(data.id, g);
+                events.emit('guildReady', g);
+            }
+            else {
+                const g = new UncachedGuild(data.d);
+                if (settings.cache) guilds.set(data.id, g);
+                events.emit('guildRecieved', g);
+            }
         }
     );
 }

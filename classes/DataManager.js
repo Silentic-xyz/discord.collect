@@ -1,4 +1,4 @@
-const fetch = require('node-fetch');
+const fetch = require('node-fetch').default;
 const Client = require('./Client');
 const Guild = require('./Guild');
 
@@ -29,15 +29,18 @@ function GuildsManager(client) {
     }
 
     async function _fetch(id) {
-        return new Guild(await fetch.default(
+        const resp = await fetch(
             `https://discord.com/api/v6/guilds/${id}`,
             {
                 headers: {
-                    Authorization: `Bot ${client.settings.token}`,
+                    Authorization: `Bot ${token}`,
                 }
             }
-        ), client.settings.token);
+        );
+        if (resp.status != 200) throw new Error(`Cannot fetch guild`);
+        return new Guild(await resp.json(), token);
     }
+    this.fetch = _fetch;
 
     this.has = has;
     this.set = set;

@@ -96,17 +96,43 @@ function Guild(raw, token) {
     this.fetchAnimatedIcon = fetchAnimatedIcon;
 
     async function _fetch(id) {
-        return new Guild(await fetch.default(
+        const resp = await fetch(
             `https://discord.com/api/v6/guilds/${id}`,
             {
                 headers: {
                     Authorization: `Bot ${token}`,
                 }
             }
-        ), token);
+        );
+        if (resp.status != 200) throw new Error(`Cannot fetch guild`);
+        return new Guild(await resp.json(), token);
     }
-    this.fetch = fetch;
+    this.fetch = _fetch;
 
     this.roles = raw.roles ? raw.roles.map(r => new Role(r)) : undefined;
 }
-module.exports = Guild;
+module.exports.Guild = Guild;
+
+/**
+ * Guild class
+ * @param {GuildRawData} raw Guild raw data
+ * @param {string} token Bot's token
+ */
+function UncachedGuild(raw, token) {
+    this.id = BigInt(raw.id);
+
+    async function _fetch(id) {
+        const resp = await fetch(
+            `https://discord.com/api/v6/guilds/${id}`,
+            {
+                headers: {
+                    Authorization: `Bot ${token}`,
+                }
+            }
+        );
+        if (resp.status != 200) throw new Error(`Cannot fetch guild`);
+        return new Guild(await resp.json(), token);
+    }
+    this.fetch = _fetch;
+}
+module.exports.UncachedGuild = UncachedGuild;
