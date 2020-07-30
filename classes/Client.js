@@ -3,6 +3,8 @@ const Heartbeat = require('./Heartbeat');
 const {GuildsManager} = require('./DataManager');
 const {Guild, UncachedGuild} = require('./Guild');
 const {EventEmitter} = require('events');
+const Message = require('./Message');
+const {Channel} = require('./Channel');
 
 /**
    @typedef { 'discord.collect' | 'Discord Android' | 'Discord IOS' | 'Discord Desktop' } ClientBrowser
@@ -66,7 +68,8 @@ const {EventEmitter} = require('events');
         ((arg0: "close", arg1: Function) => {}) &
         ((arg0: "raw", arg1: ((arg0: lib.WebSocket, arg1: RawData) => {})) => {}) &
         ((arg0: "guildRecieved", arg1: ((arg0: UncachedGuild) => {})) => {}) &
-        ((arg0: "guildReady", arg1: ((arg0: Guild) => {})) => {})
+        ((arg0: "guildReady", arg1: ((arg0: Guild) => {})) => {}) &
+        ((arg0: "message", arg1: ((arg0: Message) => {})) => {})
     } ClientEvents
  */
 
@@ -86,8 +89,6 @@ function Client(settings) {
      */
     const events = new EventEmitter();
     const guilds = new GuildsManager();
-
-    if (typeof settings.cache == 'undefined') settings.cache = true;
 
     ws.json = (d) => ws.send(JSON.stringify(d));
 
@@ -196,7 +197,7 @@ function Client(settings) {
         }
     );
 
-    events.on('raw',
+    on('raw',
         function onRaw(ws, data) {
             if (data.op != 0 && data.t != 'READY') return;
 
@@ -204,7 +205,7 @@ function Client(settings) {
         }
     );
 
-    events.on('raw',
+    on('raw',
         function onRaw(ws, data) {
             if (data.op != 0 || data.t != 'READY') return;
 
@@ -212,7 +213,7 @@ function Client(settings) {
         }
     );
 
-    events.on('raw',
+    on('raw',
         function onRaw(ws, data) {
             if (data.op != 0 || data.t != 'GUILD_CREATE') return;
 
@@ -245,7 +246,7 @@ function Client(settings) {
         }
     );
 
-    events.on('raw',
+    on('raw',
         function onRaw(ws, data) {
             if (data.op != 0 || data.t != 'GUILD_DELETE') return;
 
@@ -262,7 +263,7 @@ function Client(settings) {
         }
     );
 
-    events.on('raw',
+    on('raw',
         function onRaw(ws, data) {
             if (data.op != 0 || data.t != 'GUILD_UPDATE') return;
 
@@ -278,6 +279,13 @@ function Client(settings) {
             }
         }
     );
+
+    on('raw', (ws, data) => {
+        if (data.op != 0 || data.t != 'MESSAGE_CREATE') return;
+
+        const message = new Message(data.d, settings.token);
+        events.emit('message', message);
+    })
 }
 Client.__proto__ = EventEmitter;
 module.exports = Client;

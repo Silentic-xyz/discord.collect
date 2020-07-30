@@ -2,7 +2,7 @@ const fetch = require('node-fetch').default;
 const Role = require('./Role');
 
 /**
- * @typedef { {
+   @typedef { {
         id: string,
         name: string,
         icon: string?,
@@ -50,7 +50,7 @@ const Role = require('./Role');
         approximate_member_count: number?,
         approximate_presence_count: number?,
     } } GuildRawData
- * @typedef {{
+   @typedef {{
         id: string,
         name: string,
         color: number,
@@ -119,7 +119,7 @@ module.exports.Guild = Guild;
  * @param {string} token Bot's token
  */
 function UncachedGuild(raw, token) {
-    this.id = BigInt(raw.id);
+    this.id = raw.id;
 
     async function _fetch(id) {
         const resp = await fetch(
