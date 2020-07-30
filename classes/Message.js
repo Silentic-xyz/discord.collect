@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
 const channels = require('./Channel');
-const User = require('./User');
+const {User} = require('./User');
 
 /**
     @typedef {{
@@ -79,5 +79,6 @@ function Message(raw, token) {
     this.at = new Date(raw.timestamp);
     this.edited = raw.timestamp == raw.edited_timestamp;
     this.editedat = new Date(raw.edited_timestamp);
+    this.author = new User(raw.author);
 }
 module.exports = Message;

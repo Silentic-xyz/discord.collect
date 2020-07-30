@@ -29,6 +29,7 @@ function User(raw, token) {
     this.name = `${raw.username}#${raw.discriminator}`;
     this.username = raw.username;
     this.discriminator = raw.discriminator;
+    this.bot = raw.bot;
     
     /**
      * Fetch animated icon
